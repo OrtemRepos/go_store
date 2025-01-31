@@ -1,0 +1,19 @@
+repository:
+  savePath: "./data/urls.json"
+  inMemory: false
+server:
+  address: "localhost:8080"
+  baseAddress: "localhost:8080/api"
+database:
+  host: "localhost"
+  port: "5432"
+  dbname: "shortener"
+  user: "shortlink"
+  password: "admin"
+auth:
+  tokenExp: 10800
+  secretKey: "mySecretKey"
+worker:
+  workersCount: 2
+  bufferSize: 100
+  errMaximumAmount: 100
