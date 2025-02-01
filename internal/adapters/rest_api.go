@@ -6,10 +6,12 @@ import (
 	"net/http"
 
 	"github.com/OrtemRepos/go_store/configs"
+	"github.com/OrtemRepos/go_store/internal/auth"
 	"github.com/OrtemRepos/go_store/internal/domain"
 	"github.com/OrtemRepos/go_store/internal/ports"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type RestAPI struct {
@@ -28,17 +30,25 @@ func NewRestAPI(
 	enginge *gin.Engine,
 ) *RestAPI {
 	return &RestAPI{
-		logger: logger,
-		jwt: jwt,
+		logger:      logger,
+		jwt:         jwt,
 		userStorage: userStorage,
-		cfg: cfg,
-		Engine: enginge,
+		cfg:         cfg,
+		Engine:      enginge,
 	}
 }
 
 func (r *RestAPI) Serve() {
+	r.NoRoute(r.noPage)
 	r.POST("/api/auth", r.authUser)
 	r.POST("/api/register", r.registerUser)
+	protectedRouter := r.Group("/api", auth.AuthMiddleware(r.jwt, r.logger))
+	protectedRouter.POST("/user/orders", r.addOrder)
+	protectedRouter.GET("/user/orders", r.getOrders)
+	err := r.Run("localhost:8080")
+	if err != nil {
+		r.logger.Error("error when starting the gin server", zap.Error(err))
+	}
 }
 
 func (r *RestAPI) authUser(c *gin.Context) {
@@ -73,13 +83,13 @@ func (r *RestAPI) authUser(c *gin.Context) {
 		)
 		return
 	}
-	token, err := r.jwt.BuildJWTString(int(user.ID))
+	token, err := r.jwt.BuildJWTString(user.ID)
 	if err != nil {
 		r.logger.Error("error when creating a jwt-token", zap.Error(err))
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	c.SetCookie("auth", token, r.cfg.Auth.TokenExp, "/auth", "safety", true, true)
+	c.SetCookie("authGoOrder", token, r.cfg.Auth.TokenExp, "/", "", false, true)
 	c.JSON(http.StatusOK, gin.H{"UserID": user.ID, "msg": "successful authorization"})
 }
 
@@ -105,5 +115,57 @@ func (r *RestAPI) registerUser(c *gin.Context) {
 		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"UserID": user.ID, "msg": "registered registered user"})
+	c.JSON(http.StatusCreated, gin.H{"UserID": user.ID, "msg": "registered user"})
+}
+
+func (r *RestAPI) addOrder(c *gin.Context) {
+	userID := c.GetUint("UserID")
+	number, ok := c.GetPostForm("number")
+	if !ok {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	user, err := r.userStorage.GetByID(userID)
+	if err != nil {
+		r.logger.Error("can't get a user from the database", zap.Error(err))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	order, err := user.AddOrder(number)
+	if errors.Is(err, domain.ErrInvalidOrderNubmer) {
+		c.AbortWithStatus(http.StatusUnprocessableEntity)
+		return
+	} else if errors.Is(err, domain.ErrOrderAlreadyExistsForUser) {
+		c.AbortWithStatus(http.StatusOK)
+		return
+	}
+	err = r.userStorage.Save(user)
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		c.AbortWithStatus(http.StatusConflict)
+		return
+	} else if err != nil {
+		r.logger.Error("error when saving to the database", zap.Error(err))
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"User": user, "addedOrder": order})
+}
+
+func (r *RestAPI) getOrders(c *gin.Context) {
+	userID := c.GetUint("UserID")
+	user, err := r.userStorage.GetByID(userID)
+	if err != nil {
+		r.logger.Error(
+			"error when retrieving a user from the database by id",
+			zap.Uint("id", userID),
+			zap.Error(err),
+		)
+		c.AbortWithStatus(http.StatusInternalServerError)
+	}
+	c.JSON(http.StatusOK, gin.H{"orders": user.Orders})
+}
+
+func (r *RestAPI) noPage(c *gin.Context) {
+	c.String(http.StatusNotFound, "404 page not found")
 }

@@ -8,20 +8,20 @@ import (
 	"go.uber.org/zap"
 )
 
-func AuthMiddleware(providerJWT ports.JWT, logger zap.Logger) gin.HandlerFunc {
+func AuthMiddleware(providerJWT ports.JWT, logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		result := c.GetStringMap("result")
 		if result == nil {
 			result = make(map[string]interface{})
 		}
-		tokenString, err := c.Cookie("auth")
+		tokenString, err := c.Cookie("authGoOrder")
 		if err != nil || tokenString == "" {
-			logger.Error("Authorization failed: no auth cookie", zap.Error(err))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: no auth cookie"})
+			logger.Error("authorization failed: no auth cookie", zap.Error(err))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authorization failed: no auth cookie"})
 			return
 		}
 
-		claims, err := CheckToken(tokenString, providerJWT, &logger)
+		claims, err := CheckToken(tokenString, providerJWT, logger)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "BAD CREND"})
 			return

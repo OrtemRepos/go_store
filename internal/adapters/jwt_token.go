@@ -19,7 +19,7 @@ type ProviderJWT struct {
 
 func NewProviderJWT(cfg *configs.Config, logger *zap.Logger) *ProviderJWT {
 	return &ProviderJWT{
-		tokenExp:  time.Duration(cfg.Auth.TokenExp) * time.Second,
+		tokenExp:  time.Duration(cfg.Auth.TokenExp),
 		secretKey: []byte(cfg.Auth.SecretKey),
 		logger:    logger,
 	}
@@ -29,7 +29,7 @@ var (
 	ErrNotValidToken = errors.New("not valid token")
 )
 
-func (pj *ProviderJWT) BuildJWTString(id int) (string, error) {
+func (pj *ProviderJWT) BuildJWTString(id uint) (string, error) {
 	token := jwt.NewWithClaims(
 		jwt.SigningMethodHS256,
 		ports.Claims{
@@ -42,7 +42,7 @@ func (pj *ProviderJWT) BuildJWTString(id int) (string, error) {
 
 	tokenString, err := token.SignedString(pj.secretKey)
 	if err != nil {
-		pj.logger.Error("Failed to sign token", zap.Error(err))
+		pj.logger.Error("failed to sign token", zap.Error(err))
 		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
 
@@ -61,7 +61,7 @@ func (pj *ProviderJWT) GetClaims(tokenString string) (*ports.Claims, error) {
 		},
 	)
 	if err != nil {
-		pj.logger.Debug("Failed to parse token claims", zap.Error(err))
+		pj.logger.Debug("failed to parse token claims", zap.Error(err))
 		return nil, fmt.Errorf("failed to parse claims: %w", err)
 	}
 

@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -91,7 +92,7 @@ func GetConfig(argsToParse []string) (*Config, error) {
 	if err := overrideConfig(cfg, args, setFlags); err != nil {
 		return nil, fmt.Errorf("config override error: %w", err)
 	}
-
+	cfg.Auth.TokenExp *= int(time.Second)
 	logConfig(cfg)
 	return cfg, nil
 }

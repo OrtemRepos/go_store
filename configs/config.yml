@@ -7,8 +7,8 @@ server:
 database:
   host: "localhost"
   port: "5432"
-  dbname: "shortener"
-  user: "shortlink"
+  dbname: "store"
+  user: "store"
   password: "admin"
 auth:
   tokenExp: 10800

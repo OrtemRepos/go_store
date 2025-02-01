@@ -15,13 +15,19 @@ type UserStorageImpl struct {
 }
 
 func NewUserStorage(dsn string, logger *zap.Logger) (*UserStorageImpl, error) {
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(
+		postgres.Open(dsn),
+		&gorm.Config{
+			PrepareStmt: true,
+			TranslateError: true,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	// Auto migrate the schema
-	err = db.AutoMigrate(&domain.User{})
+	err = db.AutoMigrate(&domain.User{}, &domain.Order{})
 	if err != nil {
 		return nil, err
 	}
@@ -29,13 +35,16 @@ func NewUserStorage(dsn string, logger *zap.Logger) (*UserStorageImpl, error) {
 	return &UserStorageImpl{db: db, logger: logger}, nil
 }
 
-func (s *UserStorageImpl) GetByID(id int) (*domain.User, error) {
+func (s *UserStorageImpl) GetByID(id uint) (*domain.User, error) {
 	var user domain.User
-	result := s.db.First(&user, id)
+	result := s.db.Model(&domain.User{}).
+		Preload("Orders", func(db *gorm.DB) *gorm.DB { return db.Order("orders.created_at ASC") }).
+		Where("id = ?", id).
+		First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, errors.Join(domain.ErrUserNotExist, result.Error)
 	} else if result.Error != nil {
-		s.logger.Error("failed to get user by ID", zap.Int("id", id), zap.Error(result.Error))
+		s.logger.Error("failed to get user by ID", zap.Uint("id", id), zap.Error(result.Error))
 		return nil, result.Error
 	}
 	return &user, nil
