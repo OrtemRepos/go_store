@@ -7,12 +7,16 @@ import (
 )
 
 type User struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Email     string    `gorm:"index;unique" json:"email"`
-	Password  string    `json:"password"`
-	Orders    []*Order  `gorm:"foreignKey:UserID" json:"orders"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at,omitempty"`
+	ID             uint        `gorm:"primaryKey" json:"id"`
+	Email          string      `gorm:"index;unique" json:"email"`
+	Password       string      `json:"password"`
+	CurrentBalance int         `json:"current"`
+	Withdrawn      int         `json:"withdrawn"`
+	Orders         []*Order    `gorm:"foreignKey:UserID" json:"orders"`
+	Withdraws      []*Withdraw `gorm:"foreignKey:UserID" json:"withdraws"`
+	IsComplete     bool        `gorm:"column:completed;default:FALSE"`
+	CreatedAt      time.Time   `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time   `gorm:"autoUpdateTime" json:"updated_at,omitempty"`
 }
 
 func NewUser(email, passwordPlain string) (*User, error) {
@@ -39,8 +43,29 @@ func (u *User) AddOrder(numberOrder string) (*Order, error) {
 	}
 	order, err := NewOrder(numberOrder, u.ID)
 	if err != nil {
-		return nil, ErrInvalidOrderNubmer
+		return nil, err
 	}
 	u.Orders = append(u.Orders, order)
 	return order, nil
+}
+
+func (u *User) AddWithdrawn(numberOrder string, sum int) (*Withdraw, error) {
+	for _, order := range u.Withdraws {
+		if order.Number == numberOrder {
+			return order, ErrOrderAlreadyExistsForUser
+		}
+	}
+	if u.CurrentBalance == 0 || u.CurrentBalance < sum {
+		return nil, ErrNotEnoughPoints
+	}
+
+	
+	withdraw, err := NewWithdraw(numberOrder, sum)
+	if err != nil {
+		return nil, err
+	}
+	u.Withdraws = append(u.Withdraws, withdraw)
+	u.CurrentBalance -= sum
+	u.Withdrawn += sum
+	return withdraw, nil
 }

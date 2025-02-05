@@ -1,49 +1,32 @@
 package domain
 
 import (
-	"strconv"
 	"time"
+	"github.com/OrtemRepos/go_store/internal/common/luhn"
 )
 
-type orderStatus int
+type orderStatus string
 
 const (
-	NEW orderStatus = iota
-	PROCESSING
-	INVALID
-	PROCESSED
+	REGISTERED orderStatus = "REGISTERED"
+	PROCESSING orderStatus = "PROCESSING"
+	INVALID    orderStatus = "INVALID"
+	PROCESSED  orderStatus = "PROCESSED"
 )
 
 type Order struct {
-	ID        uint `gorm:"primaryKey;autoIncrement"`
-	UserID    uint `gorm:"not null;index"`
-	Number    string `gorm:"uniqueIndex;not null"`
-	Status    orderStatus `json:"status"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at" time_format:"rfc3339"`
-}
-
-func (o *Order) CheckValidID() bool {
-	sum := 0
-	parity := len(o.Number) % 2
-	for pos, char := range o.Number {
-		digit, err := strconv.Atoi(string(char))
-		if err != nil {
-			return false
-		}
-		if pos % 2 == parity {
-			digit *= 2
-			if digit > 9 {
-				digit = digit - 9
-			}
-		}
-		sum += digit
-	}
-	return sum%10 == 0
+	ID        uint         `gorm:"primaryKey;autoIncrement" json:"-"`
+	UserID    uint         `gorm:"not null;index" json:"-"`
+	Number    string       `gorm:"uniqueIndex;not null" json:"number"`
+	Accural   *int         `json:"accural,omitempty"`
+	Completed bool         `gorm:"default:FALSE" json:"-"`
+	Status    orderStatus  `json:"status"`
+	CreatedAt time.Time    `gorm:"autoCreateTime" json:"created_at" time_format:"rfc3339"`
 }
 
 func NewOrder(number string, userID uint) (*Order, error) {
-	order := Order{Number: number, UserID: userID, Status: NEW}
-	if !order.CheckValidID() {
+	order := Order{Number: number, UserID: userID, Status: REGISTERED}
+	if !luhn.CheckValidNumber(number) {
 		return nil, ErrInvalidOrderNubmer
 	}
 	return &order, nil

@@ -2,8 +2,8 @@ repository:
   savePath: "./data/urls.json"
   inMemory: false
 server:
-  address: "localhost:8080"
-  baseAddress: "localhost:8080/api"
+  hostAddress: "localhost:8080"
+  accuralSystemAddress: "localhost:8090"
 database:
   host: "localhost"
   port: "5432"

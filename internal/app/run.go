@@ -6,8 +6,12 @@ import (
 
 	"github.com/OrtemRepos/go_store/configs"
 	"github.com/OrtemRepos/go_store/internal/adapters"
+	"github.com/OrtemRepos/go_store/internal/service/order-service"
+	"github.com/OrtemRepos/go_store/internal/worker-pool"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 
@@ -28,7 +32,17 @@ func Run() error {
 		cfg.Database.Host, cfg.Database.User, cfg.Database.Password,
 		cfg.Database.Dbname, cfg.Database.Port,
 	)
-	userStorage, err := adapters.NewUserStorage(dsn, logger)
+	db, err := gorm.Open(
+		postgres.Open(dsn),
+		&gorm.Config{
+			PrepareStmt: true,
+			TranslateError: true,
+		},
+	)
+	if err != nil {
+		logger.Error("error while opening the database", zap.Error(err))
+	}
+	userStorage := adapters.NewUserStorage(db, logger)
 	if err != nil {
 		logger.Fatal("can't create userStorage", zap.String("dsn", dsn), zap.Error(err))
 		return err
@@ -37,8 +51,33 @@ func Run() error {
 
 	router := gin.Default()
 
+	const (
+		workerCount = 5
+		bufferSize = 100
+		errMaximumAmount = 100
+		maxRetries = 5
+		retryDelay = 1000
+	)
+	poolMetrics := worker.NewPoolMetrics()
+
+	wp := worker.NewWorkerPool(
+		"OrderWP",
+		workerCount, bufferSize, errMaximumAmount,
+		poolMetrics, worker.NewWorkerMetrics,
+		logger,
+	)
+
+	orderService, err := orderservice.NewOrderService(
+		db, logger, wp, userStorage, cfg.Server.AccuralSystemAddress,
+		maxRetries, retryDelay,
+	)
+	if err != nil {
+		logger.Fatal("ошмбка при создании OrderService", zap.Error(err))
+	}
+
 	restAPI := adapters.NewRestAPI(
 		cfg, logger, jwt, userStorage, router,
+		orderService,
 	)
 
 	restAPI.Serve()

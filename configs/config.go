@@ -14,6 +14,10 @@ import (
 )
 
 type Config struct {
+	Server   struct {
+		HostAddress          string `yaml:"hostAddress" env:"RUN_ADDRESS" env-description:"Server start address"`
+		AccuralSystemAddress string `yaml:"accuralSystemAddress" env:"ACCRUAL_SYSTEM_ADDRESS" env-description:"Accural system address"`
+	} `yaml:"server"`
 	Database struct {
 		Host     string `yaml:"host" env:"DB_HOST" env-description:"Database host-address"`
 		Port     string `yaml:"port" env:"DB_PORT" env-description:"Database port"`
@@ -29,24 +33,28 @@ type Config struct {
 }
 
 type argsCommandLine struct {
-	ConfigPath        string
-	Host              string
-	DatabasePort      string
-	Dbname            string
-	DatabaseUser      string
-	DatabasePassword  string
-	TokenExp          int
-	SecretKey         string
-	PasswordSecretKey string
+	ConfigPath           string
+	HostAddress          string
+	AccuralSystemAddress string
+	Host                 string
+	DatabasePort         string
+	Dbname               string
+	DatabaseUser         string
+	DatabasePassword     string
+	TokenExp             int
+	SecretKey            string
+	PasswordSecretKey    string
 }
 
 func processArgs(argsToParse []string) (*argsCommandLine, map[string]bool, error) {
 	a := new(argsCommandLine)
-	f := flag.NewFlagSet("shortlink", flag.ContinueOnError)
+	f := flag.NewFlagSet("order_service", flag.ContinueOnError)
 
 	f.StringVar(&a.ConfigPath, "c",
 		"/home/ortem917/go/src/github.com/OrtemRepos/go_store/configs/config.yml",
 		"Path to configuration file")
+	f.StringVar(&a.HostAddress, "a", "", "Server start address")
+	f.StringVar(&a.AccuralSystemAddress, "r", "", "Accural system address")
 	f.StringVar(&a.Host, "db-address", "", "Database host-address")
 	f.StringVar(&a.DatabasePort, "db-port", "", "Database port")
 	f.StringVar(&a.Dbname, "db-name", "", "Database name")
